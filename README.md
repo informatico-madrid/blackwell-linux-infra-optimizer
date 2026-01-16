@@ -1,35 +1,48 @@
-# vLLM Optimized Stack for NVIDIA Blackwell (RTX 5090 / SM_120) 🏎️
+# vLLM Stack for NVIDIA Blackwell (SM_120) on Linux Kernel 6.14 🏎️
 
-This repository provides a production-ready, Docker-based deployment for Large Language Models (LLMs) specifically optimized for the **NVIDIA Blackwell (Architecture 12.0)** series.
+This repository provides a production-ready deployment stack optimized for **NVIDIA Blackwell (RTX 5090)**. It specifically addresses the integration challenges between the **Linux Kernel 6.14+** and the **sm_120 architecture**.
 
-Developed to stabilize **DeepSeek-R1-32B** on consumer-grade Blackwell hardware, this stack resolves critical compatibility gaps and performance bottlenecks in current vLLM/PyTorch releases.
+## 🧠 The Bridge: Solving Kernel-Architecture Incompatibilities
 
-## 🧠 Solved Technical Challenges
+Standard LLM deployments fail on Blackwell/Kernel 6.14 due to unstable memory mapping and peer-to-peer deadlocks. This stack implements critical workarounds:
 
-Deploying on the RTX 5090 (sm_120) currently faces several "day-one" issues. This configuration successfully mitigates:
+- **Kernel 6.14 DMA-BUF Integration**: Uses `NCCL_DMABUF_ENABLE=1` to leverage native kernel memory handling, replacing the unstable `nvidia_peermem` module.
+- **SM_120 Hardware Alignment**: Specifically tuned for Blackwell's compute capability 12.0, fixing the "garbage character" output issue through **AWQ (4-bit)** quantization.
+- **Attention Backend Pivot**: Forced removal of legacy `flash-attn` in favor of **FlashInfer**, bypassing symbol errors in the new hardware instruction set.
+- **Memory Segmentation**: Optimized `PYTORCH_ALLOC_CONF` for the new kernel's memory management to prevent VRAM fragmentation.
 
-* **Output Corruption Fix**: Migrated from bitsandbytes (8-bit) to **AWQ (4-bit)**. This resolves the "garbage character" output (!!!!!!) caused by incompatible quantization kernels on SM_120.
-* **Flash-Attention Symbol Resolution**: Fixed the `undefined symbol` ImportError by performing a forced uninstall of `flash-attn` and pivoting to the **FlashInfer** backend, ensuring stable attention kernels.
-* **CUDA Graph Stability**: Implemented `--enforce-eager` to bypass block reservation failures during the warmup phase, a common issue in early SM_120 driver implementations.
-* **Kernel 6.14 & NCCL Optimization**: Enabled `expandable_segments` and `NCCL_DMABUF_ENABLE=1` to leverage the native memory subsystem of Kernel 6.14, replacing unstable `nvidia_peermem` modules.
-* **P2P Communication**: Forced `NCCL_P2P_LEVEL=PCI` to guarantee reliable data transfer between GPUs via the **PCIe Gen 5** bus.
+## 📊 Performance (2x RTX 5090)
+- **Throughput**: ~30.5 tokens/s (DeepSeek-R1-32B)
+- **Latency**: < 200ms TTFT
+- **Bus**: PCIe Gen 5 Direct Access (NCCL P2P PCI)
 
-## 📊 Performance Benchmarks (2x RTX 5090)
-* **Model**: DeepSeek-R1-Distill-Qwen-32B (AWQ)
-* **Throughput**: ~30.5 tokens/s
-* **Latency (TTFT)**: < 200ms
-* **VRAM Efficiency**: ~10GB per GPU for weights, leaving ~22GB for massive KV Cache.
+## 🛠️ Prerequisites & Manual Setup
+
+Due to the size of the components and the bleeding-edge nature of the hardware, follow these steps before deploying:
+
+### 1. Model Weights (AWQ)
+Download the optimized weights to avoid SM_120 kernel corruption:
+```bash
+pip install huggingface-hub
+huggingface-cli download casperhansen/deepseek-r1-distill-qwen-32b-awq --local-dir ./models/deepseek-r1-32b-awq
+```
+
+### 2. vLLM Source
+Clone the source code manually to the `vllm-src` directory (using shallow clone to avoid network issues):
+```bash
+git clone --depth 1 [https://github.com/vllm-project/vllm.git](https://github.com/vllm-project/vllm.git) vllm-src
+```
 
 ## 🚀 Quick Start
 
-1. **Clone the repository**:
-   git clone <your-repo-link>
+1. Clone the repository:
+   git clone https://github.com/informatico-madrid/blackwell-linux-infra-optimizer
 
-2. **Configure Secrets**:
-   cp .env.example .env (Then add your HF_TOKEN)
+2. Prepare Environment:
+   cp .env.example .env (Add your HF_TOKEN)
 
-3. **Deploy with Docker Compose**:
+3. Launch:
    docker compose up --build -d
 
-## 🤝 Community & Support
-This stack was built to save time for researchers and developers facing the initial hurdles of the Blackwell architecture. If you find this useful, feel free to contribute or report issues.
+## 🤝 Support
+This project bridges the gap for early adopters of Blackwell hardware. If this saves you hours of debugging, please give it a star! ⭐
