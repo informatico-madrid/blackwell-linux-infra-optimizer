@@ -1,0 +1,11 @@
+# Datos y modelos
+models/
+huggingface_cache/
+vllm-src/
+
+# Secretos
+.env
+
+# Sistema
+__pycache__/
+.DS_Store

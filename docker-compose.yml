@@ -1,0 +1,46 @@
+services:
+  vllm-bunker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: vllm-bunker-blackwell:latest # Esto le da un nombre a tu imagen compilada
+    container_name: vllm-bunker
+    runtime: nvidia
+    privileged: true # Necesario para acceso directo al bus PCIe Gen 5
+    ipc: host        # Optimiza la memoria compartida para NCCL
+    cpuset: "1-5,25-29"
+    ports:
+      - "8000:8000"
+    volumes:
+      - "/mnt/bunker_data/ai/vllm/models/deepseek-r1-32b-awq:/model_dir"
+      - "/mnt/bunker_data/ai/vllm/huggingface_cache:/root/.cache/huggingface"
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
+      - VLLM_USE_V1=0
+      - NCCL_DMABUF_ENABLE=1     # Activa el soporte nativo del Kernel 6.14
+      - NCCL_P2P_LEVEL=PCI       # Fuerza comunicación directa por el bus
+      - VLLM_GPU_ARCH=12.0       # Asegura que vLLM use los kernels de Blackwell
+      - NVIDIA_DISABLE_REQUIREMENTS=1
+      - VLLM_SKIP_P2P_CHECK=1
+      - NCCL_IGNORE_CPU_AFFINITY=1
+      - PYTORCH_ALLOC_CONF=expandable_segments:True
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Comando para arrancar el servidor usando el vLLM preinstalado
+    command: >
+      --model /model_dir
+      --tensor-parallel-size 2
+      --max-model-len 32768
+      --quantization awq
+      --dtype float16
+      --gpu-memory-utilization 0.9
+      --enforce-eager
+      --distributed-executor-backend mp
+      --disable-custom-all-reduce
+      --attention-backend flashinfer
+      --trust-remote-code
