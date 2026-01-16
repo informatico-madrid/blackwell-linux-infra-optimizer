@@ -17,7 +17,11 @@ RUN pip install --upgrade pip && \
 
 # CAPA DE COMPILACIÓN (vLLM puro)
 COPY vllm-src /vllm-workspace
-RUN MAX_JOBS=10 pip install -e .
+RUN git config --global http.postBuffer 1048576000 && \
+    git config --global http.version HTTP/1.1 && \
+    git config --global core.lowSpeedLimit 0 && \
+    git config --global core.lowSpeedTime 999999 && \
+    MAX_JOBS=10 pip install -e .
 
 # LIMPIEZA POST-INSTALACIÓN (Aseguramos que flash-attn no exista)
 RUN pip uninstall -y flash-attn

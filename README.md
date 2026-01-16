@@ -10,6 +10,7 @@ Standard LLM deployments fail on Blackwell/Kernel 6.14 due to unstable memory ma
 - **SM_120 Hardware Alignment**: Specifically tuned for Blackwell's compute capability 12.0, fixing the "garbage character" output issue through **AWQ (4-bit)** quantization.
 - **Attention Backend Pivot**: Forced removal of legacy `flash-attn` in favor of **FlashInfer**, bypassing symbol errors in the new hardware instruction set.
 - **Memory Segmentation**: Optimized `PYTORCH_ALLOC_CONF` for the new kernel's memory management to prevent VRAM fragmentation.
+- **Build-Time Resilience**: Hardened Git configuration during Docker build to prevent RPC/CURL failures when fetching massive dependencies like Triton Kernels.
 
 ## 📊 Performance (2x RTX 5090)
 - **Throughput**: ~30.5 tokens/s (DeepSeek-R1-32B)
