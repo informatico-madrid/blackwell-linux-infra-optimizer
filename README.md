@@ -12,10 +12,54 @@ Standard LLM deployments fail on Blackwell/Kernel 6.14 due to unstable memory ma
 - **Memory Segmentation**: Optimized `PYTORCH_ALLOC_CONF` for the new kernel's memory management to prevent VRAM fragmentation.
 - **Build-Time Resilience**: Hardened Git configuration during Docker build to prevent RPC/CURL failures when fetching massive dependencies like Triton Kernels.
 
-## 📊 Performance (2x RTX 5090)
-- **Throughput**: ~30.5 tokens/s (DeepSeek-R1-32B)
-- **Latency**: < 200ms TTFT
-- **Bus**: PCIe Gen 5 Direct Access (NCCL P2P PCI)
+## 🔬 Engineering Post-Mortem: The Blackwell Challenge
+
+This stack is the result of a multi-iteration optimization process to stabilize Large Language Models on the first generation of Blackwell (SM_120) consumer hardware.
+
+### The Quantization Trap: From BF16 to AWQ
+* **Iteration 1 (BF16)**: Total failure due to VRAM overhead. [cite_start]32B parameters at 16-bit require ~64GB, leaving zero room for KV Cache on 2x RTX 5090 setups[cite: 97].
+* [cite_start]**Iteration 2 (INT8/bitsandbytes)**: Successful memory reduction (~9.75GB/GPU) but resulted in **output corruption** (garbage characters like `!!!!!!!`)[cite: 98, 5]. [cite_start]Investigation revealed that `bitsandbytes` kernels are currently incompatible with the SM_120 instruction set[cite: 5].
+* [cite_start]**Final Solution (AWQ 4-bit)**: Migrated to `casperhansen/deepseek-r1-distill-qwen-32b-awq`[cite: 4]. [cite_start]This provided the perfect balance of memory efficiency (~10GB weights/GPU) and total output stability[cite: 16].
+
+### The Flash-Attention "Undefined Symbol" Fix
+Standard vLLM installations include `flash-attn` by default. [cite_start]On Blackwell, this library currently triggers `undefined symbol` errors[cite: 9]. 
+- [cite_start]**Action**: We implemented a forced uninstallation in the Dockerfile, pivoting the entire engine to the **FlashInfer** backend[cite: 10, 38]. [cite_start]This move alone stabilized the attention kernels for the RTX 50 series[cite: 10].
+
+## ⚡ Zero-Degree Infrastructure Optimization
+
+### Kernel 6.14 & NCCL DMA-BUF Transition
+[cite_start]Standard multi-GPU communication via `nvidia_peermem` is deprecated or highly unstable on Linux Kernel 6.14, leading to 60-second "SHM broadcast timeouts" and deadlocks.
+- [cite_start]**Deep Integration**: We bypassed `nvidia_peermem` entirely by forcing `NCCL_DMABUF_ENABLE=1`[cite: 108]. [cite_start]This leverages the native Linux DMA-BUF subsystem for direct GPU-to-GPU memory mapping, resolving critical race conditions in early Blackwell drivers[cite: 108].
+
+### Bypassing SymmMemCommunicator Limitations
+[cite_start]As of early 2026, vLLM's `SymmMemCommunicator` does not officially support Compute Capability 12.0[cite: 17]. 
+- [cite_start]**Strategy**: We implemented a manual P2P bypass using `NCCL_P2P_LEVEL=PCI` and `--disable-custom-all-reduce` to guarantee data integrity across the **PCIe Gen 5** bus[cite: 18].
+
+### 🖥️ NUMA-Aware CPU Affinity (Advanced Tuning)
+In multi-CCD architectures (like AMD Zen), cross-die communication can introduce jitter. During our benchmarks, we identified that pinning the process to **CCD1** (cores `1-5, 25-29`) provided the most stable throughput, as other CCDs were handling system-level tasks.
+
+- **Implementation**: We use the `CPU_AFFINITY` variable in the `.env` file.
+- **Default**: No affinity is applied (uses all available cores).
+- **Recommendation**: Map your cores according to your host's topology using `lscpu` to isolate the inference engine from the background system noise.
+
+## 📊 Performance Benchmarks (2x RTX 5090)
+
+| Metric | Value | Note |
+| :--- | :--- | :--- |
+| **Model** | DeepSeek-R1-32B (AWQ) | Reasoner / CoT enabled |
+| **Throughput** | **~59.0 tokens/s** | Optimized via FlashInfer + TP=2 |
+| **Prefix Cache Hit Rate** | **44.4%** | Drastic latency reduction on recurring prompts |
+| **KV Cache Utilization** | **1.2%** | High-concurrency headroom for 32k context |
+| **Bus Performance** | PCIe Gen 5 P2P | Verified NCCL P2P PCI link |
+
+### 🛠️ Hardware Synergy
+- **CPU**: AMD Threadripper 7960X (NUMA-pinned)
+- **RAM**: 128GB DDR5 (Memory pressure management during SM_120 compilation)
+- **VRAM**: 64GB Total (2x RTX 5090)
+
+## 🚀 Production Benchmarks
+Don't just take our word for it. See "La Bestia" (The Beast) in action designing complex system architectures:
+👉 [View DeepSeek-R1 32B Performance Showcase](./benchmarks/deepseek_r1_32b_performance.md)
 
 ## 🛠️ Prerequisites & Manual Setup
 

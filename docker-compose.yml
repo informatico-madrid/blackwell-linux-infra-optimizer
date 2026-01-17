@@ -1,29 +1,35 @@
 services:
   vllm-bunker:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
-    image: vllm-bunker-blackwell:latest # Esto le da un nombre a tu imagen compilada
+      args:
+        - MAX_JOBS=${MAX_COMPILE_JOBS:-4}
+        - GPU_ARCH=${GPU_ARCH:-12.0}
+    image: vllm-bunker-blackwell:latest
     container_name: vllm-bunker
     runtime: nvidia
-    privileged: true # Necesario para acceso directo al bus PCIe Gen 5
-    ipc: host        # Optimiza la memoria compartida para NCCL
-    cpuset: "1-5,25-29"
+    # Security/Performance Trade-off: Privileged mode enabled for direct PCIe Gen 5 bus access
+    privileged: true
+    # Optimization: Host IPC for zero-copy shared memory communication in NCCL
+    ipc: host
+    # NUMA-Awareness: Pinning to specific CCDs to minimize Infinity Fabric latency
+    cpuset: ${CPU_SET:-}
     ports:
       - "8000:8000"
     volumes:
-      - "/mnt/bunker_data/ai/vllm/models/deepseek-r1-32b-awq:/model_dir"
-      - "/mnt/bunker_data/ai/vllm/huggingface_cache:/root/.cache/huggingface"
+      - "${MODELS_PATH}:/model_dir"
+      - "${HF_CACHE_PATH}:/root/.cache/huggingface"
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
       - VLLM_USE_V1=0
-      - NCCL_DMABUF_ENABLE=1     # Activa el soporte nativo del Kernel 6.14
-      - NCCL_P2P_LEVEL=PCI       # Fuerza comunicación directa por el bus
-      - VLLM_GPU_ARCH=12.0       # Asegura que vLLM use los kernels de Blackwell
+      - NCCL_DMABUF_ENABLE=1      # Critical: Bypasses unstable nvidia_peermem in Kernel 6.14
+      - NCCL_P2P_LEVEL=PCI        # Force direct bus communication
+      - VLLM_GPU_ARCH=${GPU_ARCH} # Targeting Blackwell kernels
+      - PYTORCH_ALLOC_CONF=expandable_segments:True # Mitigates VRAM fragmentation
       - NVIDIA_DISABLE_REQUIREMENTS=1
       - VLLM_SKIP_P2P_CHECK=1
       - NCCL_IGNORE_CPU_AFFINITY=1
-      - PYTORCH_ALLOC_CONF=expandable_segments:True
     deploy:
       resources:
         reservations:
@@ -31,14 +37,13 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    # Comando para arrancar el servidor usando el vLLM preinstalado
     command: >
-      --model /model_dir
-      --tensor-parallel-size 2
-      --max-model-len 32768
-      --quantization awq
-      --dtype float16
-      --gpu-memory-utilization 0.9
+      --model ${MODEL_NAME}
+      --tensor-parallel-size ${TENSOR_PARALLEL_SIZE}
+      --max-model-len ${MAX_MODEL_LEN}
+      --quantization ${QUANTIZATION}
+      --dtype ${DTYPE}
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION}
       --enforce-eager
       --distributed-executor-backend mp
       --disable-custom-all-reduce

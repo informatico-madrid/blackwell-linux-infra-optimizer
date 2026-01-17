@@ -1,0 +1,15 @@
+{
+  "model": "/model_dir",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a Principal AI Infrastructure Architect specializing in Sovereign AI and Edge Computing."
+    },
+    {
+      "role": "user",
+      "content": "Design a multi-region RAG (Retrieval-Augmented Generation) architecture for a global legal firm with strict data sovereignty requirements. The system must use local inference nodes running DeepSeek-R1 and a local vector database. Explain: 1. How to handle KV-Cache synchronization for long-running legal document analysis. 2. A strategy for mitigating cold-start latency using prefix caching. 3. How to ensure zero-leakage between jurisdictions while maintaining a global knowledge index."
+    }
+  ],
+  "max_tokens": 8192,
+  "temperature": 0.6
+}

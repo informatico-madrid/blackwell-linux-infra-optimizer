@@ -1,7 +1,12 @@
 FROM nvcr.io/nvidia/pytorch:25.12-py3
 
-ENV VLLM_GPU_ARCH=12.0
-ENV TORCH_CUDA_ARCH_LIST="12.0"
+# Declare ARGs to receive values from docker-compose
+ARG GPU_ARCH
+ARG MAX_JOBS
+
+# Metadata for sm_120 (Blackwell) hardware alignment
+ENV VLLM_GPU_ARCH=${GPU_ARCH}
+ENV TORCH_CUDA_ARCH_LIST=${GPU_ARCH}
 ENV NCCL_DMABUF_ENABLE=1
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
@@ -9,21 +14,27 @@ RUN apt-get update && apt-get install -y build-essential cmake ninja-build && rm
 
 WORKDIR /vllm-workspace
 
-# CAPA DE LIBRERÍAS (Sin bitsandbytes y sin flash-attn)
+# Optimization: Pre-installing standard heavy dependencies to leverage Docker layer caching
 RUN pip install --upgrade pip && \
     pip install uvloop sentencepiece \
                 fastapi uvicorn pydantic prometheus-client \
                 lm-format-enforcer outlines kernels
 
-# CAPA DE COMPILACIÓN (vLLM puro)
+# Context: Copying local vLLM source for custom sm_120 kernel compilation
 COPY vllm-src /vllm-workspace
-RUN git config --global http.postBuffer 1048576000 && \
-    git config --global http.version HTTP/1.1 && \
-    git config --global core.lowSpeedLimit 0 && \
-    git config --global core.lowSpeedTime 999999 && \
-    MAX_JOBS=10 pip install -e .
 
-# LIMPIEZA POST-INSTALACIÓN (Aseguramos que flash-attn no exista)
+# Performance: Threadripper-optimized parallel compilation. 
+# Logic: Dynamic job scaling to prevent OOM while maximizing 128GB RAM throughput.
+RUN ACTUAL_JOBS=${MAX_JOBS}; \
+    if [ "$ACTUAL_JOBS" -eq "4" ]; then \
+        CPUS=$(nproc); \
+        ACTUAL_JOBS=$(( CPUS > 8 ? 8 : CPUS )); \
+    fi; \
+    echo "Compiling with $ACTUAL_JOBS threads for SM_120 target..." && \
+    MAX_JOBS=$ACTUAL_JOBS pip install -e .
+
+# Critical Fix: Removal of legacy flash-attn to force the engine to use FlashInfer backend,
+# avoiding 'undefined symbol' errors prevalent in Blackwell's new instruction set.
 RUN pip uninstall -y flash-attn
 
 EXPOSE 8000
