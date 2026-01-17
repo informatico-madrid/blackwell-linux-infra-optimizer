@@ -90,32 +90,6 @@ Clone the source code manually to the `vllm-src` directory (using shallow clone 
 git clone --depth 1 [https://github.com/vllm-project/vllm.git](https://github.com/vllm-project/vllm.git) vllm-src
 ```
 
-Joao, tienes toda la razón. Como Architect, la precisión en la entrega de artefactos es innegociable. Para que puedas copiar todo el contenido del README.md de una sola vez, incluyendo sus propios bloques de código internos, necesito envolverlo en un bloque de cuatro acentos abiertos (````).
-
-Aquí tienes el bloque completo, corregido con el paso del .env y listo para tu repositorio:
-
-Markdown
-
-# Blackwell Linux Infra Optimizer 🚀
-
-Optimized vLLM inference stack for **NVIDIA Blackwell (SM_120)** architecture running on **Linux Kernel 6.14**.
-
-## 📊 Performance Benchmarks
-![Model Throughput](benchmarks/screenshots/ModelPerformance.png)
-*DeepSeek-R1-32B-AWQ achieving **59.0 tokens/s** on dual RTX 5090 setup.*
-
-## 🏗️ Engineering Highlights
-- **Native SM_120 Build**: Custom kernels compiled specifically for Blackwell series.
-- **Kernel 6.14 Compatibility**: Solved legacy `flash-attn` symbol errors by pivoting to **FlashInfer**.
-- **HPC Resource Management**: Automated thread-scaling (42 cores utilized on TR 7960X).
-- **Sovereign AI**: 100% local inference, zero-leakage architecture.
-
-## 🛠️ Hardware Stress Test
-![CPU Stress Test](benchmarks/screenshots/cpu-stress-42jobs.png)
-*Full throttle: 42 compilation threads at 4.8GHz sustained.*
-
----
-
 ## 🚀 Quick Start
 
 Follow these steps to deploy the optimized stack in your local bunker:
