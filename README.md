@@ -43,6 +43,8 @@ In multi-CCD architectures (like AMD Zen), cross-die communication can introduce
 - **Recommendation**: Map your cores according to your host's topology using `lscpu` to isolate the inference engine from the background system noise.
 
 ## 📊 Performance Benchmarks (2x RTX 5090)
+![Model Throughput](benchmarks/screenshots/ModelPerformance.png)
+*DeepSeek-R1-32B achieving **59.0 tokens/s** on dual RTX 5090 setup.*
 
 | Metric | Value | Note |
 | :--- | :--- | :--- |
@@ -51,6 +53,16 @@ In multi-CCD architectures (like AMD Zen), cross-die communication can introduce
 | **Prefix Cache Hit Rate** | **44.4%** | Drastic latency reduction on recurring prompts |
 | **KV Cache Utilization** | **1.2%** | High-concurrency headroom for 32k context |
 | **Bus Performance** | PCIe Gen 5 P2P | Verified NCCL P2P PCI link |
+
+## 🏗️ Engineering Highlights
+- **Architecture**: Native SM_120 (Blackwell) compilation.
+- **Backend**: FlashInfer integration (Flash-Attn bypass for Kernel 6.14 compatibility).
+- **Orchestration**: Automated thread-scaling (42 cores utilized on TR 7960X).
+- **Sovereignty**: 100% local, air-gapped ready.
+
+## 🛠️ Hardware Stress Test
+![CPU Stress Test](benchmarks/screenshots/cpu-stress-42jobs.png)
+*Full throttle: 42 compilation threads at 4.8GHz sustained.*
 
 ### 🛠️ Hardware Synergy
 - **CPU**: AMD Threadripper 7960X (NUMA-pinned)
@@ -78,16 +90,91 @@ Clone the source code manually to the `vllm-src` directory (using shallow clone 
 git clone --depth 1 [https://github.com/vllm-project/vllm.git](https://github.com/vllm-project/vllm.git) vllm-src
 ```
 
+Joao, tienes toda la razón. Como Architect, la precisión en la entrega de artefactos es innegociable. Para que puedas copiar todo el contenido del README.md de una sola vez, incluyendo sus propios bloques de código internos, necesito envolverlo en un bloque de cuatro acentos abiertos (````).
+
+Aquí tienes el bloque completo, corregido con el paso del .env y listo para tu repositorio:
+
+Markdown
+
+# Blackwell Linux Infra Optimizer 🚀
+
+Optimized vLLM inference stack for **NVIDIA Blackwell (SM_120)** architecture running on **Linux Kernel 6.14**.
+
+## 📊 Performance Benchmarks
+![Model Throughput](benchmarks/screenshots/ModelPerformance.png)
+*DeepSeek-R1-32B-AWQ achieving **59.0 tokens/s** on dual RTX 5090 setup.*
+
+## 🏗️ Engineering Highlights
+- **Native SM_120 Build**: Custom kernels compiled specifically for Blackwell series.
+- **Kernel 6.14 Compatibility**: Solved legacy `flash-attn` symbol errors by pivoting to **FlashInfer**.
+- **HPC Resource Management**: Automated thread-scaling (42 cores utilized on TR 7960X).
+- **Sovereign AI**: 100% local inference, zero-leakage architecture.
+
+## 🛠️ Hardware Stress Test
+![CPU Stress Test](benchmarks/screenshots/cpu-stress-42jobs.png)
+*Full throttle: 42 compilation threads at 4.8GHz sustained.*
+
+---
+
 ## 🚀 Quick Start
 
-1. Clone the repository:
-   git clone https://github.com/informatico-madrid/blackwell-linux-infra-optimizer
+Follow these steps to deploy the optimized stack in your local bunker:
 
-2. Prepare Environment:
-   cp .env.example .env (Add your HF_TOKEN)
+### 1. Clone the repository
+```bash
+git clone https://github.com/informatico-madrid/blackwell-linux-infra-optimizer.git
+cd blackwell-linux-infra-optimizer
+```
 
-3. Launch:
-   docker compose up --build -d
+### 2. Environment Configuration
+You must set up your environment variables before building or running the container.
+```bash
+# Copy the template
+cp .env.example .env
+
+# Edit the file with your credentials and hardware specs
+# Mandatory: HF_TOKEN (Hugging Face)
+# Optional: MAX_JOBS (Default: 42 for TR 7960X)
+nano .env 
+```
+
+### 3. Build & Deploy
+You can use the pre-built image from Docker Hub or build it locally to ensure maximum hardware alignment:
+
+```bash
+# Option A: Build locally (Recommended for SM_120 optimization)
+docker compose build
+
+# Option B: Launch the stack
+docker compose up -d
+```
+
+### 4. Verify Inference
+Test the engine with a professional-grade prompt:
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "/model_dir",
+    "messages": [
+      {
+        "role": "user", 
+        "content": "Explain the advantages of FlashInfer in Blackwell architecture."
+      }
+    ],
+    "max_tokens": 512,
+    "temperature": 0.6
+  }'
+```
+
+---
+
+## 📂 Project Structure
+- `benchmarks/screenshots/`: Proof of performance and hardware metrics.
+- `vllm-src/`: Git submodule for vLLM core.
+- `Dockerfile`: Multi-stage build optimized for SM_120.
+- `.env.example`: Template for infrastructure variables.
+- `docker-compose.yml`: Production-ready orchestration.
 
 ## 🤝 Support
 This project bridges the gap for early adopters of Blackwell hardware. If this saves you hours of debugging, please give it a star! ⭐
