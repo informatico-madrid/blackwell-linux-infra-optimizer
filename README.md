@@ -1,5 +1,5 @@
 # vLLM Stack for NVIDIA Blackwell (SM_120) on Linux Kernel 6.14 🏎️
-
+Optimized vLLM deployment for NVIDIA Blackwell (SM_120) architecture on Linux Kernel 6.14. This stack solves the flash-attn symbol errors and achieves a sustained 58.6 tokens/s on DeepSeek-R1-32B-AWQ.
 This repository provides a production-ready deployment stack optimized for **NVIDIA Blackwell (RTX 5090)**. It specifically addresses the integration challenges between the **Linux Kernel 6.14+** and the **sm_120 architecture**.
 
 ## 🧠 The Bridge: Solving Kernel-Architecture Incompatibilities
